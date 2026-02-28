@@ -1,0 +1,88 @@
+
+Kafka installation on windows
+Download the latest version tgz file from https://kafka.apache.org/downloads
+Extract the file on C:\ root. Lets imagine KAFKA_HOME=C:\kafka_2.13-4.1.0
+
+
+Modify server.properties
+#security.inter.broker.protocol=SASL_PLAINTEXT
+inter.broker.listener.name=SASL_PLAINTEXT
+sasl.mechanism.inter.broker.protocol=PLAIN
+sasl.enabled.mechanisms=PLAIN
+auto.create.topics.enable=false
+listeners=SASL_PLAINTEXT://:9092,CONTROLLER://:9093
+advertised.listeners=SASL_PLAINTEXT://localhost:9092,CONTROLLER://localhost:9093
+advertised.host.name=localhost
+delete.topic.enable=true
+#authorizer.class.name=org.apache.kafka.metadata.authorizer.StandardAuthorizer
+super.users=User:admin
+allow.everyone.if.no.acl.found=true
+
+Create jaas-kafka-server.conf
+KafkaServer {
+org.apache.kafka.common.security.plain.PlainLoginModule required
+username="admin"
+password="admin"
+user_admin="admin"
+user_tom="tom"
+user_jerry="jerry";
+};
+
+Create jaas-client.properties
+sasl.mechanism=PLAIN
+security.protocol=SASL_PLAINTEXT
+
+Create kafka_client_jaas.conf
+KafkaClient {
+  org.apache.kafka.common.security.plain.PlainLoginModule required
+  serviceName="kafkaclient"
+  security.protocol=SASL_PLAINTEXT
+  sasl.mechanism=PLAIN
+  group.id="test"
+  bootstrap.servers="localhost:9092"
+  username="admin"
+  password="admin";
+};
+
+
+.\bin\windows\kafka-storage.bat random-uuid
+.\bin\windows\kafka-storage.bat random-uuid
+
+Cluster id:
+Jso5VBh6RFGMsHuU6rKy2A
+
+Broker id:
+mK4LdEWnTeyLmL4yU2f05A
+
+Format the broker:
+.\bin\windows\kafka-storage.bat format --cluster-id Jso5VBh6RFGMsHuU6rKy2A --config .\config\server.properties --initial-controllers "1@localhost:9093:mK4LdEWnTeyLmL4yU2f05A"
+
+
+Start Broker
+SET KAFKA_OPTS=-Djava.security.auth.login.config=C:/kafka_2.13-4.2.0/config/jaas-kafka-server.conf
+.\bin\windows\kafka-server-start.bat .\config\server.properties
+
+Create topic
+SET KAFKA_OPTS=-Djava.security.auth.login.config=C:/kafka_2.13-4.2.0/config/kafka_client_jaas.conf
+.\bin\windows\kafka-topics.bat --create --bootstrap-server localhost:9092 --replication-factor 1 --partitions 1 --topic ZenTopic --command-config C:/kafka_2.13-4.2.0/config/jaas-client.properties
+
+Start consumer
+SET KAFKA_OPTS=-Djava.security.auth.login.config=C:/kafka_2.13-4.2.0/config/kafka_client_jaas.conf
+.\bin\windows\kafka-console-consumer.bat --topic ZenTopic --from-beginning --bootstrap-server localhost:9092 --command-config C:/kafka_2.13-4.2.0/config/jaas-client.properties
+
+Start producer
+SET KAFKA_OPTS=-Djava.security.auth.login.config=C:/kafka_2.13-4.2.0/config/kafka_client_jaas.conf
+.\bin\windows\kafka-console-producer.bat --topic ZenTopic --bootstrap-server localhost:9092 --producer.config C:/kafka_2.13-4.2.0/config/jaas-client.properties
+Type the message & press Enter to send it. Confirm that on consumer console, the message is displayed.
+
+
+************************* Authorization (ACL) *************************
+
+Authority to create new topic:
+SET KAFKA_OPTS=-Djava.security.auth.login.config=C:/kafka_2.13-4.2.0/config/kafka_client_jaas.conf
+.\bin\windows\kafka-acls.bat --bootstrap-server localhost:9092 --add --operation Create --allow-principal User:tom --topic ZenTopic --command-config C:/kafka_2.13-4.2.0/config/jaas-client.properties
+
+Authority to consume topic messages:
+SET KAFKA_OPTS=-Djava.security.auth.login.config=C:/kafka_2.13-4.2.0/config/kafka_client_jaas.conf
+.\bin\windows\kafka-acls.bat --bootstrap-server localhost:9092 --add --allow-principal User:tom --consumer --topic ZenTopic --group test --command-config C:/kafka_2.13-4.2.0/config/jaas-client.properties
+
